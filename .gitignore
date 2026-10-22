@@ -1,0 +1,8 @@
+# Individual DLL files
+*.dll
+
+# Compiled executables
+*.exe
+
+# Generated video recordings
+*.mp4
