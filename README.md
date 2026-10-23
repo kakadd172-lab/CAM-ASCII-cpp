@@ -3,6 +3,7 @@
 A C++ webcam-to-ASCII project that turns a live camera feed into a real-time character-based visual display. The project evolved through multiple versions, from earlier webcam ASCII implementations to a more configurable, terminal-inspired visual engine with several rendering styles and image/video export.
 
 **Repository:** [kakadd172-lab/CAM-ASCII-cpp](https://github.com/kakadd172-lab/CAM-ASCII-cpp)
+**Created by:** [Divy179](https://github.com/kakadd172-lab)
 
 ## Overview
 
