@@ -235,8 +235,20 @@
       body { height: auto; min-height: 100vh; overflow: auto; }
       .app { height: auto; min-height: calc(100vh - 20px); }
       .panel { flex: none; overflow: visible; }
-      .screen { min-height: 0; }
-      canvas.emscripten { max-height: 52vh; max-width: 100%; }
+      .screen { min-height: 0; padding: 4px; }
+      .emscripten_border {
+        width: 100%;
+        min-width: 0;
+        border-radius: 6px;
+      }
+      canvas.emscripten {
+        width: 100%;
+        height: auto;
+        max-width: 100%;
+        max-height: 52vh;
+        max-height: 52svh;
+        object-fit: contain;
+      }
       .mobile-controls { display: grid; }
       footer { padding-bottom: 4px; }
     }
@@ -246,7 +258,7 @@
       header { margin-bottom: 12px; }
       .mark { width: 38px; height: 38px; }
       .subtitle { font-size: 10px; }
-      .screen { min-height: 180px; padding: 4px; }
+      .screen { min-height: 0; padding: 4px; }
       .panel-top { padding: 10px; }
     }
   </style>
