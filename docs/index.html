@@ -31,7 +31,11 @@
 
     .app {
       width: min(100%, 1200px);
+      height: 100%;
       margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
     }
 
     header {
@@ -86,6 +90,10 @@
     }
 
     .panel {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
       overflow: hidden;
       border: 1px solid #27334a;
       border-radius: 16px;
