@@ -344,19 +344,28 @@
       mobileMenuButton.textContent = open ? '✕ Close controls' : '☰ Controls';
     });
 
-    // Forward touch selections to the same keyboard handler used by raylib.
+    // Raylib's browser input layer reads keydown/keyup on window.
+    // Keep the key held briefly so the WASM main loop can observe the press.
     document.querySelectorAll('#mobileMenu [data-key]').forEach((button) => {
       button.addEventListener('click', () => {
         const key = button.dataset.key;
         const keyCode = key.length === 1 ? key.toUpperCase().charCodeAt(0) : 0;
         const code = key >= '1' && key <= '9' ? 'Digit' + key : 'Key' + key.toUpperCase();
-        window.dispatchEvent(new KeyboardEvent('keydown', {
-          key, code, keyCode, which: keyCode, bubbles: true, cancelable: true
-        }));
-        window.dispatchEvent(new KeyboardEvent('keyup', {
-          key, code, keyCode, which: keyCode, bubbles: true, cancelable: true
-        }));
+        const makeKeyEvent = (type) => {
+          const event = new KeyboardEvent(type, {
+            key, code, bubbles: true, cancelable: true
+          });
+          // Some browsers ignore keyCode/which in KeyboardEvent's constructor.
+          Object.defineProperty(event, 'keyCode', { get: () => keyCode });
+          Object.defineProperty(event, 'which', { get: () => keyCode });
+          return event;
+        };
+
         canvasElement.focus();
+        window.dispatchEvent(makeKeyEvent('keydown'));
+        window.setTimeout(() => {
+          window.dispatchEvent(makeKeyEvent('keyup'));
+        }, 80);
       });
     });
 
