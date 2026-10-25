@@ -327,7 +327,18 @@
             <button type="button" data-key="r">Record</button>
           </div>
         </div>
-        <p style="margin:0;color:#65748c;font-size:11px;line-height:1.5">Brightness and contrast controls will be added after the touch-input bridge is working.</p>
+        <div class="menu-section">
+          <span class="menu-label">Image tuning</span>
+          <div class="menu-grid">
+            <button type="button" data-adjust="font" data-direction="-1">Font −</button>
+            <button type="button" data-adjust="font" data-direction="1">Font +</button>
+            <button type="button" data-adjust="brightness" data-direction="-1">Brightness −</button>
+            <button type="button" data-adjust="brightness" data-direction="1">Brightness +</button>
+            <button type="button" data-adjust="contrast" data-direction="-1">Contrast −</button>
+            <button type="button" data-adjust="contrast" data-direction="1">Contrast +</button>
+          </div>
+        </div>
+        <p style="margin:0;color:#65748c;font-size:11px;line-height:1.5">Image tuning uses the app's existing pause-menu keyboard controls.</p>
       </div>
 
       <div id="status">Starting application…</div>
@@ -360,35 +371,53 @@
 
     // Raylib's browser input layer reads keydown/keyup on window.
     // Keep the key held briefly so the WASM main loop can observe the press.
+    function dispatchAppKey(key) {
+      const keyCodeMap = { ArrowLeft: 37, ArrowUp: 38, ArrowRight: 39, ArrowDown: 40, Enter: 13, Escape: 27 };
+      const keyCode = keyCodeMap[key] || (key.length === 1 ? key.toUpperCase().charCodeAt(0) : 0);
+      const codeMap = { ArrowLeft: 'ArrowLeft', ArrowUp: 'ArrowUp', ArrowRight: 'ArrowRight', ArrowDown: 'ArrowDown', Enter: 'Enter', Escape: 'Escape' };
+      const code = codeMap[key] || (key >= '1' && key <= '9' ? 'Digit' + key : 'Key' + key.toUpperCase());
+      const eventKey = ({ ArrowLeft: 'ArrowLeft', ArrowUp: 'ArrowUp', ArrowRight: 'ArrowRight', ArrowDown: 'ArrowDown' })[key] || key;
+      const makeKeyEvent = (type) => {
+        const event = new KeyboardEvent(type, { key: eventKey, code, bubbles: true, cancelable: true });
+        Object.defineProperty(event, 'keyCode', { get: () => keyCode });
+        Object.defineProperty(event, 'which', { get: () => keyCode });
+        return event;
+      };
+      window.dispatchEvent(makeKeyEvent('keydown'));
+      window.setTimeout(() => {
+        window.dispatchEvent(makeKeyEvent('keyup'));
+        if (window.matchMedia('(max-width: 520px), (pointer: coarse)').matches) {
+          canvasElement.style.setProperty('display', 'block', 'important');
+          canvasElement.style.setProperty('width', '100%', 'important');
+          canvasElement.style.setProperty('height', '52svh', 'important');
+          canvasElement.style.setProperty('max-width', '100%', 'important');
+          canvasElement.style.setProperty('max-height', 'none', 'important');
+        }
+      }, 100);
+    }
+
     document.querySelectorAll('#mobileMenu [data-key]').forEach((button) => {
       button.addEventListener('click', () => {
-        const key = button.dataset.key;
-        const keyCode = key.length === 1 ? key.toUpperCase().charCodeAt(0) : 0;
-        const code = key >= '1' && key <= '9' ? 'Digit' + key : 'Key' + key.toUpperCase();
-        const makeKeyEvent = (type) => {
-          const event = new KeyboardEvent(type, {
-            key, code, bubbles: true, cancelable: true
-          });
-          // Some browsers ignore keyCode/which in KeyboardEvent's constructor.
-          Object.defineProperty(event, 'keyCode', { get: () => keyCode });
-          Object.defineProperty(event, 'which', { get: () => keyCode });
-          return event;
-        };
-
         canvasElement.focus();
-        window.dispatchEvent(makeKeyEvent('keydown'));
+        dispatchAppKey(button.dataset.key.length === 1 ? button.dataset.key : button.dataset.key);
+      });
+    });
+
+    // The existing pause menu uses item 1 for font size, 2 for brightness,
+    // and 3 for contrast. Open it, select the item, adjust once, then resume.
+    document.querySelectorAll('#mobileMenu [data-adjust]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const item = { font: 1, brightness: 2, contrast: 3 }[button.dataset.adjust];
+        const direction = Number(button.dataset.direction) < 0 ? 'ArrowLeft' : 'ArrowRight';
+        canvasElement.focus();
+        dispatchAppKey('p');
         window.setTimeout(() => {
-          window.dispatchEvent(makeKeyEvent('keyup'));
-          // The WASM engine may reset the canvas drawing-buffer dimensions
-          // after a mode change. Reapply the phone-sized CSS display box.
-          if (window.matchMedia('(max-width: 520px), (pointer: coarse)').matches) {
-            canvasElement.style.setProperty('display', 'block', 'important');
-            canvasElement.style.setProperty('width', '100%', 'important');
-            canvasElement.style.setProperty('height', '52svh', 'important');
-            canvasElement.style.setProperty('max-width', '100%', 'important');
-            canvasElement.style.setProperty('max-height', 'none', 'important');
+          for (let i = 0; i < item; i++) {
+            window.setTimeout(() => dispatchAppKey('ArrowDown'), i * 130);
           }
-        }, 100);
+          window.setTimeout(() => dispatchAppKey(direction), item * 130 + 130);
+          window.setTimeout(() => dispatchAppKey('p'), item * 130 + 300);
+        }, 150);
       });
     });
 
