@@ -180,33 +180,57 @@
     }
 
 
-    /* Touch controls are shown only on narrow/mobile layouts. */
-    .mobile-controls { display: none; }
-    .mobile-controls button {
-      min-height: 44px;
-      padding: 10px 12px;
-      border: 1px solid #2d4158;
+    .mobile-menu-wrap { display: none; }
+    .mobile-menu-button {
+      min-height: 42px;
+      padding: 9px 14px;
+      border: 1px solid #36e5c066;
       border-radius: 10px;
-      background: #111b2a;
-      color: #e8edf7;
+      background: #101b2a;
+      color: #36e5c0;
       font: inherit;
-      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
       touch-action: manipulation;
     }
-    .mobile-controls button:active { background: #1d3b43; border-color: #36e5c0; }
-    .mobile-controls .control-label {
+    .mobile-menu {
+      display: none;
+      padding: 12px;
+      border-top: 1px solid #202b3d;
+      background: #0a101b;
+      gap: 14px;
+    }
+    .mobile-menu.open { display: grid; }
+    .mobile-menu .menu-section { display: grid; gap: 8px; }
+    .mobile-menu .menu-label {
       color: #8b9ab3;
       font-size: 11px;
       letter-spacing: .1em;
       text-transform: uppercase;
     }
-    .mode-buttons, .action-buttons, .toggle-buttons {
+    .mobile-menu .menu-grid {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 8px;
+      gap: 7px;
     }
-    .mobile-controls { padding: 12px; border-top: 1px solid #202b3d; gap: 12px; }
-    .mobile-controls .control-section { display: grid; gap: 8px; }
+    .mobile-menu button:not(.mobile-menu-button) {
+      min-height: 40px;
+      padding: 8px 6px;
+      border: 1px solid #2d4158;
+      border-radius: 9px;
+      background: #111b2a;
+      color: #e8edf7;
+      font: inherit;
+      font-size: 12px;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    .mobile-menu button:active { border-color: #36e5c0; background: #1d3b43; }
+    @media (max-width: 520px) {
+      .mobile-menu-wrap { display: block; padding: 8px 10px; border-top: 1px solid #202b3d; }
+      .mobile-menu { margin: 0; }
+    }
+
     @media (max-width: 520px) {
       body { height: auto; min-height: 100vh; overflow: auto; }
       .app { height: auto; min-height: calc(100vh - 20px); }
@@ -254,10 +278,14 @@
       </div>
 
 
-      <div class="mobile-controls" aria-label="Touch controls">
-        <div class="control-section">
-          <span class="control-label">Render mode</span>
-          <div class="mode-buttons">
+      <div class="mobile-menu-wrap">
+        <button type="button" class="mobile-menu-button" id="mobileMenuButton"
+                aria-expanded="false" aria-controls="mobileMenu">☰ Controls</button>
+      </div>
+      <div class="mobile-menu" id="mobileMenu" aria-label="Camera controls">
+        <div class="menu-section">
+          <span class="menu-label">Render mode</span>
+          <div class="menu-grid">
             <button type="button" data-key="1">RGB</button>
             <button type="button" data-key="2">Matrix</button>
             <button type="button" data-key="3">Edge</button>
@@ -269,23 +297,23 @@
             <button type="button" data-key="9">Glitch</button>
           </div>
         </div>
-        <div class="control-section">
-          <span class="control-label">Effects</span>
-          <div class="toggle-buttons">
+        <div class="menu-section">
+          <span class="menu-label">Effects</span>
+          <div class="menu-grid">
             <button type="button" data-key="c">CRT</button>
             <button type="button" data-key="h">HUD</button>
             <button type="button" data-key="q">Detail</button>
           </div>
         </div>
-        <div class="control-section">
-          <span class="control-label">Camera</span>
-          <div class="action-buttons">
+        <div class="menu-section">
+          <span class="menu-label">Camera</span>
+          <div class="menu-grid">
             <button type="button" data-key="p">Pause / Resume</button>
             <button type="button" data-key="s">Snapshot</button>
             <button type="button" data-key="r">Record</button>
           </div>
         </div>
-        <p style="margin:0;color:#65748c;font-size:11px;line-height:1.5">For brightness and contrast, use the app’s pause menu. These touch buttons send the same keyboard commands as the desktop controls.</p>
+        <p style="margin:0;color:#65748c;font-size:11px;line-height:1.5">Brightness and contrast controls will be added after the touch-input bridge is working.</p>
       </div>
 
       <div id="status">Starting application…</div>
@@ -308,18 +336,25 @@
     var outputElement = document.getElementById('output');
 
 
-    // Mobile buttons forward the same keys used by the existing C++ app.
-    document.querySelectorAll('.mobile-controls [data-key]').forEach((button) => {
+    const mobileMenuButton = document.getElementById('mobileMenuButton');
+    const mobileMenu = document.getElementById('mobileMenu');
+    mobileMenuButton.addEventListener('click', () => {
+      const open = mobileMenu.classList.toggle('open');
+      mobileMenuButton.setAttribute('aria-expanded', String(open));
+      mobileMenuButton.textContent = open ? '✕ Close controls' : '☰ Controls';
+    });
+
+    // Forward touch selections to the same keyboard handler used by raylib.
+    document.querySelectorAll('#mobileMenu [data-key]').forEach((button) => {
       button.addEventListener('click', () => {
         const key = button.dataset.key;
         const keyCode = key.length === 1 ? key.toUpperCase().charCodeAt(0) : 0;
-        canvasElement.dispatchEvent(new KeyboardEvent('keydown', {
-          key,
-          code: key >= '1' && key <= '9' ? 'Digit' + key : 'Key' + key.toUpperCase(),
-          keyCode,
-          which: keyCode,
-          bubbles: true,
-          cancelable: true
+        const code = key >= '1' && key <= '9' ? 'Digit' + key : 'Key' + key.toUpperCase();
+        window.dispatchEvent(new KeyboardEvent('keydown', {
+          key, code, keyCode, which: keyCode, bubbles: true, cancelable: true
+        }));
+        window.dispatchEvent(new KeyboardEvent('keyup', {
+          key, code, keyCode, which: keyCode, bubbles: true, cancelable: true
         }));
         canvasElement.focus();
       });
