@@ -330,6 +330,8 @@
             <button type="button" data-key="p">Pause / Resume</button>
             <button type="button" data-key="s">Snapshot</button>
             <button type="button" data-key="r">Record</button>
+            <button type="button" data-camera="user">Front camera</button>
+            <button type="button" data-camera="environment">Back camera</button>
           </div>
         </div>
         <div class="menu-section">
@@ -407,6 +409,42 @@
         canvasElement.focus();
         dispatchAppKey(button.dataset.key.length === 1 ? button.dataset.key : button.dataset.key);
       });
+    });
+
+    // Switch the browser camera stream without restarting the WebAssembly app.
+    async function switchBrowserCamera(facingMode) {
+      const video = Module.browserCameraVideo;
+      if (!video || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        statusElement.textContent = 'Camera switching is not supported by this browser.';
+        return;
+      }
+
+      const buttons = document.querySelectorAll('#mobileMenu [data-camera]');
+      buttons.forEach((button) => { button.disabled = true; });
+      statusElement.textContent = facingMode === 'environment' ? 'Switching to back camera…' : 'Switching to front camera…';
+
+      try {
+        const previousStream = video.srcObject;
+        const newStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false
+        });
+        video.srcObject = newStream;
+        await video.play();
+        if (previousStream && previousStream !== newStream) {
+          previousStream.getTracks().forEach((track) => track.stop());
+        }
+        statusElement.textContent = facingMode === 'environment' ? 'Back camera active' : 'Front camera active';
+      } catch (error) {
+        console.error('Camera switch failed:', error);
+        statusElement.textContent = 'Could not switch camera. This device/browser may not provide that camera.';
+      } finally {
+        buttons.forEach((button) => { button.disabled = false; });
+      }
+    }
+
+    document.querySelectorAll('#mobileMenu [data-camera]').forEach((button) => {
+      button.addEventListener('click', () => switchBrowserCamera(button.dataset.camera));
     });
 
     // The existing pause menu uses item 1 for font size, 2 for brightness,
