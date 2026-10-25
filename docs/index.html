@@ -242,12 +242,14 @@
         border-radius: 6px;
       }
       canvas.emscripten {
-        width: 100%;
-        height: auto;
+        display: block;
+        width: 100% !important;
+        height: 52vh !important;
+        height: 52svh !important;
         max-width: 100%;
-        max-height: 52vh;
-        max-height: 52svh;
-        object-fit: contain;
+        max-height: none;
+        aspect-ratio: 3 / 4;
+        object-fit: fill;
       }
       .mobile-controls { display: grid; }
       footer { padding-bottom: 4px; }
