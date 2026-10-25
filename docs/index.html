@@ -379,7 +379,16 @@
         window.dispatchEvent(makeKeyEvent('keydown'));
         window.setTimeout(() => {
           window.dispatchEvent(makeKeyEvent('keyup'));
-        }, 80);
+          // The WASM engine may reset the canvas drawing-buffer dimensions
+          // after a mode change. Reapply the phone-sized CSS display box.
+          if (window.matchMedia('(max-width: 520px), (pointer: coarse)').matches) {
+            canvasElement.style.setProperty('display', 'block', 'important');
+            canvasElement.style.setProperty('width', '100%', 'important');
+            canvasElement.style.setProperty('height', '52svh', 'important');
+            canvasElement.style.setProperty('max-width', '100%', 'important');
+            canvasElement.style.setProperty('max-height', 'none', 'important');
+          }
+        }, 100);
       });
     });
 
