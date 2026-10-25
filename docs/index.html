@@ -423,21 +423,57 @@
       buttons.forEach((button) => { button.disabled = true; });
       statusElement.textContent = facingMode === 'environment' ? 'Switching to back camera…' : 'Switching to front camera…';
 
+      const previousStream = video.srcObject;
+      const previousTrack = previousStream && previousStream.getVideoTracks()[0];
+      const previousFacing = previousTrack && previousTrack.getSettings
+        ? previousTrack.getSettings().facingMode
+        : '';
+      let newStream = null;
+
       try {
-        const previousStream = video.srcObject;
-        const newStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } },
-          audio: false
-        });
+        // Prefer an exact facing-mode request so the browser does not silently
+        // keep using the front camera when the back camera was requested.
+        try {
+          newStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { exact: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } },
+            audio: false
+          });
+        } catch (firstError) {
+          // Some mobile browsers cannot open the second camera while the first
+          // stream is active. Release it, then retry the requested camera.
+          if (previousStream) previousStream.getTracks().forEach((track) => track.stop());
+          newStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { exact: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } },
+            audio: false
+          });
+        }
+
         video.srcObject = newStream;
         await video.play();
-        if (previousStream && previousStream !== newStream) {
-          previousStream.getTracks().forEach((track) => track.stop());
-        }
         statusElement.textContent = facingMode === 'environment' ? 'Back camera active' : 'Front camera active';
       } catch (error) {
         console.error('Camera switch failed:', error);
-        statusElement.textContent = 'Could not switch camera. This device/browser may not provide that camera.';
+        if (newStream) newStream.getTracks().forEach((track) => track.stop());
+
+        // If switching failed after releasing the old stream, try to restore
+        // the previous camera rather than leaving the preview blank.
+        if (previousFacing && video.srcObject !== previousStream) {
+          try {
+            const restored = await navigator.mediaDevices.getUserMedia({
+              video: { facingMode: { ideal: previousFacing }, width: { ideal: 1280 }, height: { ideal: 720 } },
+              audio: false
+            });
+            video.srcObject = restored;
+            await video.play();
+          } catch (restoreError) {
+            console.error('Could not restore previous camera:', restoreError);
+          }
+        } else if (previousStream && previousStream.getTracks().some((track) => track.readyState === 'live')) {
+          video.srcObject = previousStream;
+        }
+
+        const reason = error && error.name ? error.name : 'unknown error';
+        statusElement.textContent = 'Camera switch failed (' + reason + '). Check camera permission and try again.';
       } finally {
         buttons.forEach((button) => { button.disabled = false; });
       }
