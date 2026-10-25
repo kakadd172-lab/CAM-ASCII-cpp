@@ -244,11 +244,10 @@
       canvas.emscripten {
         display: block;
         width: 100% !important;
-        height: 52vh !important;
-        height: 52svh !important;
+        height: auto !important;
         max-width: 100%;
         max-height: none;
-        aspect-ratio: 3 / 4;
+        aspect-ratio: 16 / 9;
         object-fit: fill;
       }
       .mobile-controls { display: grid; }
@@ -389,7 +388,8 @@
         if (window.matchMedia('(max-width: 520px), (pointer: coarse)').matches) {
           canvasElement.style.setProperty('display', 'block', 'important');
           canvasElement.style.setProperty('width', '100%', 'important');
-          canvasElement.style.setProperty('height', '52svh', 'important');
+          canvasElement.style.setProperty('height', 'auto', 'important');
+          canvasElement.style.setProperty('aspect-ratio', '16 / 9', 'important');
           canvasElement.style.setProperty('max-width', '100%', 'important');
           canvasElement.style.setProperty('max-height', 'none', 'important');
         }
