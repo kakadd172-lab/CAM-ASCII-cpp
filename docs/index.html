@@ -134,11 +134,13 @@
 
     canvas.emscripten {
       display: block;
-      width: 100%;
-      max-width: 100%;
+      width: auto;
       height: auto;
+      max-width: 100%;
+      max-height: calc(100vh - 260px);
       border: 0;
       background: #000;
+      object-fit: contain;
     }
 
     #status {
