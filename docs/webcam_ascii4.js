@@ -9964,8 +9964,122 @@ var ASM_CONSTS = {
  207748: () => { return window.innerHeight; },  
  207775: () => { if (document.pointerLockElement) return 1; }
 };
-function BrowserStartRecording(filename) { const canvas = document.getElementById('canvas'); if (!canvas || !canvas.captureStream || !window.MediaRecorder) return 0; let mime = null; for (const candidate of [ 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm' ]) { if (MediaRecorder.isTypeSupported(candidate)) { mime = candidate; break; } } if (!mime) return 0; try { const stream = canvas.captureStream(30); const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 16000000 }); Module.browserRecorder = recorder; Module.browserRecordingStream = stream; Module.browserRecordingChunks = []; Module.browserRecordingFilename = UTF8ToString(filename); recorder.ondataavailable = function(event) { if (event.data && event.data.size > 0) Module.browserRecordingChunks.push(event.data); }; recorder.onstop = function() { const blob = new Blob(Module.browserRecordingChunks, { type: recorder.mimeType || 'video/webm' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = Module.browserRecordingFilename || 'ascii_recording.webm'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000); stream.getTracks().forEach(track => track.stop()); Module.browserRecorder = null; Module.browserRecordingStream = null; Module.browserRecordingChunks = []; }; recorder.start(1000); return 1; } catch (error) { console.error('Could not start browser recording:', error); return 0; } }
-function BrowserStopRecording() { const recorder = Module.browserRecorder; if (recorder && recorder.state !== 'inactive') recorder.stop(); }
+async function StartDesktopMP4Recording(filename, state) {
+  const library = window.ASCII_MP4_READY ? await window.ASCII_MP4_READY : null;
+  if (!library) throw new Error('The MP4 encoder could not be loaded.');
+
+  const { Output, Mp4OutputFormat, BufferTarget, CanvasSource, Quality } = library;
+  const canvas = document.getElementById('canvas');
+  if (!canvas || !canvas.width || !canvas.height) {
+    throw new Error('The desktop render canvas is not ready.');
+  }
+
+  const output = new Output({
+    format: new Mp4OutputFormat(),
+    target: new BufferTarget()
+  });
+  const videoSource = new CanvasSource(canvas, {
+    codec: 'avc',
+    quality: new Quality('high')
+  });
+  output.addVideoTrack(videoSource, { frameRate: 30 });
+  await output.start();
+
+  state.output = output;
+  state.videoSource = videoSource;
+  state.startedAt = performance.now();
+  state.frameCount = 0;
+  state.finalizing = false;
+
+  const addFrame = async () => {
+    const timestamp = state.frameCount / 30;
+    await videoSource.add(timestamp, 1 / 30);
+    state.frameCount++;
+  };
+
+  // Encode the existing PC canvas at its current native dimensions.
+  // No canvas resizing, cropping, or aspect-ratio changes are performed.
+  await addFrame();
+
+  const finish = async () => {
+    if (state.finalizing) return;
+    state.finalizing = true;
+    try {
+      videoSource.close();
+      await output.finalize();
+      const buffer = output.target.buffer;
+      if (!buffer || buffer.byteLength === 0) {
+        throw new Error('The MP4 encoder returned an empty file.');
+      }
+
+      const blob = new Blob([buffer], { type: 'video/mp4' });
+      const cleanName = (filename || 'ascii_recording').replace(/\\.(mp4|webm|mov)$/i, '');
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = cleanName + '.mp4';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } finally {
+      if (Module.browserMp4State === state) Module.browserMp4State = null;
+    }
+  };
+
+  const tick = async () => {
+    if (state.stopRequested) {
+      await finish();
+      return;
+    }
+
+    const elapsed = (performance.now() - state.startedAt) / 1000;
+    if (elapsed >= state.frameCount / 30) await addFrame();
+
+    if (state.stopRequested) {
+      await finish();
+      return;
+    }
+
+    state.raf = requestAnimationFrame(() => {
+      tick().catch(error => {
+        console.error('Desktop MP4 recording failed:', error);
+        alert('MP4 recording failed: ' + (error.message || error));
+        if (Module.browserMp4State === state) Module.browserMp4State = null;
+      });
+    });
+  };
+
+  state.raf = requestAnimationFrame(() => {
+    tick().catch(error => {
+      console.error('Desktop MP4 recording failed:', error);
+      alert('MP4 recording failed: ' + (error.message || error));
+      if (Module.browserMp4State === state) Module.browserMp4State = null;
+    });
+  });
+}
+
+function BrowserStartRecording(filename) {
+  if (Module.browserMp4State) return 0;
+
+  const state = { stopRequested: false, raf: 0 };
+  Module.browserMp4State = state;
+  const requestedName = UTF8ToString(filename);
+
+  StartDesktopMP4Recording(requestedName, state).catch(error => {
+    console.error('Could not start desktop MP4 recording:', error);
+    alert('MP4 recording could not start: ' + (error.message || error));
+    if (Module.browserMp4State === state) Module.browserMp4State = null;
+  });
+
+  return 1;
+}
+
+function BrowserStopRecording() {
+  if (Module.browserMp4State) {
+    Module.browserMp4State.stopRequested = true;
+  }
+}
 function BrowserDownloadPNG(filename) { const canvas = document.getElementById('canvas'); if (!canvas) { console.error('ASCII canvas not found.'); return; } canvas.toBlob(function(blob) { if (!blob) { console.error('Could not create PNG screenshot.'); return; } const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = UTF8ToString(filename); document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000); }, 'image/png'); }
 function BrowserDownloadPNGBytes(filename,bytes,length) { const copy = HEAPU8.slice(bytes, bytes + length); const blob = new Blob([copy], { type: 'image/png' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = UTF8ToString(filename); document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000); }
 function BrowserDownloadText(filename,contents) { const blob = new Blob([UTF8ToString(contents)], { type: 'text/plain;charset=utf-8' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = UTF8ToString(filename); document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000); }
