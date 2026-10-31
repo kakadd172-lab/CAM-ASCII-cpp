@@ -548,15 +548,11 @@
         Object.defineProperty(event, 'which', { get: () => keyCode });
         return event;
       };
-      // Send input straight to the same GLFW handler used by real keyboard events.
-      // This is more reliable on mobile browsers, which may treat synthetic
-      // KeyboardEvents differently from physical key presses.
+      // Emscripten's GLFW handlers are attached to window. Do not access
+      // Module.GLFW here: this build does not export GLFW, and Emscripten's
+      // Module proxy throws an abort when an unexported runtime symbol is read.
       const sendKey = (pressed) => {
-        if (Module.GLFW && Module.GLFW.active && typeof Module.GLFW.onKeyChanged === 'function') {
-          Module.GLFW.onKeyChanged(keyCode, pressed ? 1 : 0);
-        } else {
-          window.dispatchEvent(makeKeyEvent(pressed ? 'keydown' : 'keyup'));
-        }
+        window.dispatchEvent(makeKeyEvent(pressed ? 'keydown' : 'keyup'));
       };
       sendKey(true);
       window.setTimeout(() => {
