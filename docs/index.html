@@ -394,8 +394,8 @@
       // This is more reliable on mobile browsers, which may treat synthetic
       // KeyboardEvents differently from physical key presses.
       const sendKey = (pressed) => {
-        if (typeof GLFW !== 'undefined' && GLFW.active && typeof GLFW.onKeyChanged === 'function') {
-          GLFW.onKeyChanged(keyCode, pressed ? 1 : 0);
+        if (Module.GLFW && Module.GLFW.active && typeof Module.GLFW.onKeyChanged === 'function') {
+          Module.GLFW.onKeyChanged(keyCode, pressed ? 1 : 0);
         } else {
           window.dispatchEvent(makeKeyEvent(pressed ? 'keydown' : 'keyup'));
         }
