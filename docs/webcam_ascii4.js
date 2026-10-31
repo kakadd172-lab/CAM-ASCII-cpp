@@ -8842,6 +8842,9 @@ var stringToUTF8Array = (str, heap, outIdx, maxBytesToWrite) => {
         return table[param];
       },
   };
+  // Expose GLFW input to the page's mobile controls.
+  Module.GLFW = GLFW;
+
   var _glfwCreateWindow = (width, height, title, monitor, share) => GLFW.createWindow(width, height, title, monitor, share);
 
   var _glfwDefaultWindowHints = () => GLFW.defaultWindowHints();
