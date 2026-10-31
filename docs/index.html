@@ -378,7 +378,24 @@
 
     // Raylib's browser input layer reads keydown/keyup on window.
     // Keep the key held briefly so the WASM main loop can observe the press.
+    window.ASCII_EXPORT_STATE = window.ASCII_EXPORT_STATE || {
+      mode: 4,
+      crtScanlines: true,
+      hideHUD: false,
+      contrast: 1,
+      brightness: 0
+    };
+
     function dispatchAppKey(key) {
+      const exportState = window.ASCII_EXPORT_STATE;
+      if (/^[1-9]$/.test(key)) exportState.mode = Number(key);
+      if (key === 'c') exportState.crtScanlines = !exportState.crtScanlines;
+      if (key === 'h') exportState.hideHUD = !exportState.hideHUD;
+      if (key === 's' && typeof window.ASCII_EXPORT_PORTRAIT_PNG_NOW === 'function') {
+        // The PNG is generated directly from the camera as a portrait ASCII
+        // render. The WASM snapshot key still saves the existing TXT file.
+        window.ASCII_EXPORT_PORTRAIT_PNG_NOW();
+      }
       const keyCodeMap = { ArrowLeft: 37, ArrowUp: 38, ArrowRight: 39, ArrowDown: 40, Enter: 13, Escape: 27 };
       const keyCode = keyCodeMap[key] || (key.length === 1 ? key.toUpperCase().charCodeAt(0) : 0);
       const codeMap = { ArrowLeft: 'ArrowLeft', ArrowUp: 'ArrowUp', ArrowRight: 'ArrowRight', ArrowDown: 'ArrowDown', Enter: 'Enter', Escape: 'Escape' };
@@ -390,9 +407,19 @@
         Object.defineProperty(event, 'which', { get: () => keyCode });
         return event;
       };
-      window.dispatchEvent(makeKeyEvent('keydown'));
+      // Send input straight to the same GLFW handler used by real keyboard events.
+      // This is more reliable on mobile browsers, which may treat synthetic
+      // KeyboardEvents differently from physical key presses.
+      const sendKey = (pressed) => {
+        if (Module.GLFW && Module.GLFW.active && typeof Module.GLFW.onKeyChanged === 'function') {
+          Module.GLFW.onKeyChanged(keyCode, pressed ? 1 : 0);
+        } else {
+          window.dispatchEvent(makeKeyEvent(pressed ? 'keydown' : 'keyup'));
+        }
+      };
+      sendKey(true);
       window.setTimeout(() => {
-        window.dispatchEvent(makeKeyEvent('keyup'));
+        sendKey(false);
         if (window.matchMedia('(max-width: 520px), (pointer: coarse)').matches) {
           canvasElement.style.setProperty('display', 'block', 'important');
           canvasElement.style.setProperty('width', '100%', 'important');
@@ -488,7 +515,14 @@
     document.querySelectorAll('#mobileMenu [data-adjust]').forEach((button) => {
       button.addEventListener('click', () => {
         const item = { font: 1, brightness: 2, contrast: 3 }[button.dataset.adjust];
-        const direction = Number(button.dataset.direction) < 0 ? 'ArrowLeft' : 'ArrowRight';
+        const sign = Number(button.dataset.direction) < 0 ? -1 : 1;
+        if (button.dataset.adjust === 'brightness') {
+          window.ASCII_EXPORT_STATE.brightness = Math.max(-100, Math.min(100, window.ASCII_EXPORT_STATE.brightness + sign * 2));
+        }
+        if (button.dataset.adjust === 'contrast') {
+          window.ASCII_EXPORT_STATE.contrast = Math.max(0.5, Math.min(2.5, window.ASCII_EXPORT_STATE.contrast + sign * 0.05));
+        }
+        const direction = sign < 0 ? 'ArrowLeft' : 'ArrowRight';
         canvasElement.focus();
         dispatchAppKey('p');
         window.setTimeout(() => {
@@ -545,14 +579,14 @@
     };
   </script>
 
-    <script>
-    // Load the same MP4 encoder used by the phone build.
+  <script>
+    // Dynamic import starts immediately and is available before the async app runtime.
     window.ASCII_MP4_READY = import('https://cdn.jsdelivr.net/npm/mediabunny@1.62.1/+esm')
       .catch(error => {
         console.error('MP4 encoder library could not be loaded:', error);
         return null;
       });
   </script>
-<script async type="text/javascript" src="webcam_ascii4.js?v=20261031-desktop-mp4-1"></script>
+  <script async type="text/javascript" src="webcam_ascii4.js?v=20261031-original-mobile-portrait"></script>
 </body>
 </html>
