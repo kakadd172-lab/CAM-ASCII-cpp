@@ -545,6 +545,14 @@
     };
   </script>
 
-  <script async type="text/javascript" src="webcam_ascii4.js"></script>
+    <script>
+    // Load the same MP4 encoder used by the phone build.
+    window.ASCII_MP4_READY = import('https://cdn.jsdelivr.net/npm/mediabunny@1.62.1/+esm')
+      .catch(error => {
+        console.error('MP4 encoder library could not be loaded:', error);
+        return null;
+      });
+  </script>
+<script async type="text/javascript" src="webcam_ascii4.js?v=20261031-desktop-mp4-1"></script>
 </body>
 </html>
