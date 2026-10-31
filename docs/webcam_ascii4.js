@@ -10013,7 +10013,7 @@ async function StartDesktopMP4Recording(filename, state) {
       }
 
       const blob = new Blob([buffer], { type: 'video/mp4' });
-      const cleanName = (filename || 'ascii_recording').replace(/\\.(mp4|webm|mov)$/i, '');
+      const cleanName = (filename || 'ascii_recording').replace(/\.(mp4|webm|mov)$/i, '');
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
