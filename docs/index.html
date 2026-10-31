@@ -193,12 +193,53 @@
       cursor: pointer;
       touch-action: manipulation;
     }
+    .mobile-menu-toolbar {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .mobile-menu-toolbar .mobile-menu-button {
+      width: 100%;
+      min-width: 0;
+      padding: 9px 8px;
+    }
     .mobile-menu {
       display: none;
       padding: 12px;
       border-top: 1px solid #202b3d;
       background: #0a101b;
       gap: 14px;
+    }
+    #diagnosticsLog {
+      max-height: min(34vh, 260px);
+      min-height: 72px;
+      overflow: auto;
+      margin: 0;
+      padding: 10px;
+      border: 1px solid #26334a;
+      border-radius: 8px;
+      background: #05080e;
+      color: #cbd5e1;
+      font: 11px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      user-select: text;
+    }
+    #diagnosticsMenu .diagnostics-actions {
+      display: flex;
+      gap: 8px;
+    }
+    #diagnosticsMenu .diagnostics-actions button { flex: 1; }
+    #diagnosticsCount {
+      display: inline-block;
+      min-width: 20px;
+      margin-left: 3px;
+      padding: 2px 5px;
+      border-radius: 99px;
+      background: #243246;
+      color: #e8edf7;
+      font-size: 10px;
+      text-align: center;
     }
     .mobile-menu.open { display: grid; }
     .mobile-menu .menu-section { display: grid; gap: 8px; }
@@ -298,8 +339,17 @@
 
 
       <div class="mobile-menu-wrap">
-        <button type="button" class="mobile-menu-button" id="mobileMenuButton"
-                aria-expanded="false" aria-controls="mobileMenu">☰ Controls</button>
+        <div class="mobile-menu-toolbar">
+          <button type="button" class="mobile-menu-button" id="mobileMenuButton"
+                  aria-expanded="false" aria-controls="mobileMenu">
+            <span id="controlsButtonLabel">☰ Controls</span>
+          </button>
+          <button type="button" class="mobile-menu-button" id="diagnosticsMenuButton"
+                  aria-expanded="false" aria-controls="diagnosticsMenu">
+            <span id="diagnosticsButtonLabel">⚠ Diagnostics</span>
+            <span id="diagnosticsCount">0</span>
+          </button>
+        </div>
       </div>
       <div class="mobile-menu" id="mobileMenu" aria-label="Camera controls">
         <div class="menu-section">
@@ -348,6 +398,17 @@
         <p style="margin:0;color:#65748c;font-size:11px;line-height:1.5">Image tuning uses the app's existing pause-menu keyboard controls.</p>
       </div>
 
+      <div class="mobile-menu" id="diagnosticsMenu" aria-label="Browser diagnostics">
+        <div class="menu-section">
+          <span class="menu-label">Browser errors and console errors</span>
+          <pre id="diagnosticsLog">No errors captured yet. Open Controls and tap a control to reproduce the problem.</pre>
+          <div class="diagnostics-actions">
+            <button type="button" id="copyDiagnosticsButton">Copy log</button>
+            <button type="button" id="clearDiagnosticsButton">Clear log</button>
+          </div>
+        </div>
+      </div>
+
       <div id="status">Starting application…</div>
       <div style="text-align:center;padding:0 12px 12px">
         <progress value="0" max="100" id="progress" hidden></progress>
@@ -370,11 +431,91 @@
 
     const mobileMenuButton = document.getElementById('mobileMenuButton');
     const mobileMenu = document.getElementById('mobileMenu');
+    const controlsButtonLabel = document.getElementById('controlsButtonLabel');
+    const diagnosticsMenuButton = document.getElementById('diagnosticsMenuButton');
+    const diagnosticsButtonLabel = document.getElementById('diagnosticsButtonLabel');
+    const diagnosticsMenu = document.getElementById('diagnosticsMenu');
+    const diagnosticsLog = document.getElementById('diagnosticsLog');
+    const diagnosticsCount = document.getElementById('diagnosticsCount');
+    const diagnosticEntries = [];
+
+    function addDiagnosticEntry(type, details) {
+      const entry = '[' + new Date().toLocaleTimeString() + '] ' + type + '\n' + String(details || '(no details available)');
+      diagnosticEntries.push(entry);
+      if (diagnosticEntries.length > 30) diagnosticEntries.shift();
+      diagnosticsLog.textContent = diagnosticEntries.join('\n\n');
+      diagnosticsCount.textContent = String(diagnosticEntries.length);
+      diagnosticsLog.scrollTop = diagnosticsLog.scrollHeight;
+    }
+
+    function formatDiagnosticValue(value) {
+      if (value instanceof Error) return value.stack || value.message || String(value);
+      if (typeof value === 'string') return value;
+      try {
+        const serialized = JSON.stringify(value);
+        return serialized === undefined ? String(value) : serialized;
+      } catch (_) {
+        return String(value);
+      }
+    }
+
+    function updateMobileMenuButtons() {
+      const controlsOpen = mobileMenu.classList.contains('open');
+      const diagnosticsOpen = diagnosticsMenu.classList.contains('open');
+      mobileMenuButton.setAttribute('aria-expanded', String(controlsOpen));
+      diagnosticsMenuButton.setAttribute('aria-expanded', String(diagnosticsOpen));
+      controlsButtonLabel.textContent = controlsOpen ? '✕ Close controls' : '☰ Controls';
+      diagnosticsButtonLabel.textContent = diagnosticsOpen ? '✕ Close diagnostics' : '⚠ Diagnostics';
+    }
+
     mobileMenuButton.addEventListener('click', () => {
-      const open = mobileMenu.classList.toggle('open');
-      mobileMenuButton.setAttribute('aria-expanded', String(open));
-      mobileMenuButton.textContent = open ? '✕ Close controls' : '☰ Controls';
+      const open = !mobileMenu.classList.contains('open');
+      mobileMenu.classList.toggle('open', open);
+      diagnosticsMenu.classList.remove('open');
+      updateMobileMenuButtons();
     });
+
+    diagnosticsMenuButton.addEventListener('click', () => {
+      const open = !diagnosticsMenu.classList.contains('open');
+      diagnosticsMenu.classList.toggle('open', open);
+      mobileMenu.classList.remove('open');
+      updateMobileMenuButtons();
+    });
+
+    document.getElementById('clearDiagnosticsButton').addEventListener('click', () => {
+      diagnosticEntries.length = 0;
+      diagnosticsLog.textContent = 'Log cleared. Reproduce the issue to capture new errors.';
+      diagnosticsCount.textContent = '0';
+    });
+
+    document.getElementById('copyDiagnosticsButton').addEventListener('click', async () => {
+      const logText = diagnosticEntries.length
+        ? diagnosticEntries.join('\n\n')
+        : 'No browser errors have been captured.';
+      try {
+        await navigator.clipboard.writeText(logText);
+        document.getElementById('copyDiagnosticsButton').textContent = 'Copied!';
+      } catch (error) {
+        addDiagnosticEntry('Clipboard copy failed', formatDiagnosticValue(error));
+        document.getElementById('copyDiagnosticsButton').textContent = 'Copy failed';
+      }
+    });
+
+    // Keep console output visible in DevTools while also collecting it here.
+    const originalConsoleError = console.error.bind(console);
+    console.error = (...args) => {
+      addDiagnosticEntry('console.error', args.map(formatDiagnosticValue).join(' '));
+      originalConsoleError(...args);
+    };
+
+    // Capture failed script, stylesheet, image, and other resource loads.
+    window.addEventListener('error', (event) => {
+      if (event.target && event.target !== window) {
+        const target = event.target;
+        addDiagnosticEntry('Resource load error',
+          (target.tagName || 'Resource') + ': ' + (target.src || target.href || 'unknown resource'));
+      }
+    }, true);
 
     // Raylib's browser input layer reads keydown/keyup on window.
     // Keep the key held briefly so the WASM main loop can observe the press.
@@ -528,6 +669,7 @@
     });
 
     canvasElement.addEventListener('webglcontextlost', (e) => {
+      addDiagnosticEntry('WebGL context lost', 'The graphics context was lost. Reload the page after copying this log.');
       alert('Graphics context lost. Please reload the page.');
       e.preventDefault();
     }, false);
@@ -566,8 +708,21 @@
 
     setStatus('Loading WebAssembly…');
 
-    window.onerror = window.onunhandledrejection = () => {
-      setStatus('An error occurred. Check the browser console.');
+    window.onerror = (message, source, lineno, colno, error) => {
+      setStatus('An error occurred. Open Diagnostics for details.');
+      const details = [
+        String(message || 'Unknown JavaScript error'),
+        source ? 'Source: ' + source + ':' + (lineno || 0) + ':' + (colno || 0) : '',
+        error ? formatDiagnosticValue(error) : ''
+      ].filter(Boolean).join('\n');
+      addDiagnosticEntry('JavaScript error', details);
+      return false;
+    };
+
+    window.onunhandledrejection = (event) => {
+      setStatus('An error occurred. Open Diagnostics for details.');
+      const reason = event && 'reason' in event ? event.reason : event;
+      addDiagnosticEntry('Unhandled promise rejection', formatDiagnosticValue(reason));
     };
   </script>
 
@@ -579,6 +734,6 @@
         return null;
       });
   </script>
-  <script async type="text/javascript" src="webcam_ascii4.js?v=20261031-controls-render-fix"></script>
+  <script async type="text/javascript" src="webcam_ascii4.js?v=20261101-mobile-diagnostics"></script>
 </body>
 </html>
